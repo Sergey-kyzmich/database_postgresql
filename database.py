@@ -103,17 +103,18 @@ class database:
         Данные на вход не требуются.\n
         Внимание! Является асинхронной функцией."""
         try:
-            self.conn.close()#* Закрытие подключения к бд
-            if self.ssh_tonel!=None:self.ssh_tonel.close()#* Закрытие подключения к серверу(если используется ssh тунель)
-            
             #* Фиксация действий в бд
             await self.add_log(
                 text=f"Подключение успешно завершено.",
                 type="INFO"
             )
+            self.conn.close()#* Закрытие подключения к бд
+            if self.ssh_tonel!=None:self.ssh_tonel.close()#* Закрытие подключения к серверу(если используется ssh тунель)
+            
+            
             #* Проверка на тестовый режим
             if self.test_mode:
-                print(f"{F.GREEN}INFO:{S.RESET_ALL}     Подключение успешно завершено.")
+                print(f"{F.GREEN}INFO:{S.RESET_ALL}     Подключение к бд успешно закрыто.")
                 
             return self.ret(value=True)
         
@@ -506,7 +507,6 @@ class database:
                 text = text.replace("'", '"')
                 execute = f"""INSERT INTO log (id, type, date, text_log) VALUES (DEFAULT, '{type}', '{f'{datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")}'}', '{text}')"""
                 self.cursor.execute(execute)
-                
                 if "ret" in kvarg:
                     return kvarg["ret"]
                 else:
