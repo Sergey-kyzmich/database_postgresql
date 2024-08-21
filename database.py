@@ -259,7 +259,7 @@ class database:
                 )
             else:
                 return self.ret(value=self.cursor.fetchall())
-        
+            
         except Exception as e:
             error =f"{sys.exc_info()[1]} | function: {inspect.trace()[-1][3]} | line: {sys.exc_info()[2].tb_lineno} |  path: {inspect.trace()[0][1]}"
             await self.add_log(
@@ -327,7 +327,6 @@ class database:
             array_data = await self.set_values_from_type(data=data, type_data=type_data)
 
             if type(array_data)!= list:#* если при преобразовании возникла ошибка
-                print("error:", array_data)
                 return self.ret(error=f"{array_data}")
             #* если при создании array_data ошибок не возникло
             execute = f"""INSERT INTO {table} 
@@ -569,3 +568,9 @@ class database:
             if self.test_mode:print(f"{F.RED}{error}{S.RESET_ALL}")
             return self.ret(error=error)
         
+
+if __name__=="__main__":
+    from asyncio import run
+    db = database(test_mode=True)
+    run(db.connect())
+    print(run(db.get_all(table="users")).value)
