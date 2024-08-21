@@ -2,15 +2,15 @@
 import sys
 from colorama import Fore as F, Style as S
 import inspect
-# список всех таблиц: log, subscription, sales, tasks, users_temporary, users
-#? Добавление папки server в список путей, чтобы можно было импортировать get_my_ip
-# sys.path.append(''.join(map(lambda x: x+"\\", sys.path[0].split('\\')[:-1])))
-# if sys.path[-1]=='':sys.path.append(''.join(map(lambda x: x+"/", sys.path[0].split('/')[:-1])))
-# print(sys.path)
-import create_connect
-from config import configs, create_tables, column_type
-# import get_my_ip
 import pydantic
+import datetime
+
+try:#* Если запускается из текущей директории
+    import create_connect as create_connect
+    from config import configs, create_tables, column_type
+except:#* Если запускается из директории ниже и данный файл находится в ./database
+    import database.create_connect as create_connect
+    from database.config import configs, create_tables, column_type
 
 #* Функция вызывается при запуске кода и выполняет подключение к серверу
 class database:
@@ -35,16 +35,33 @@ class database:
         try:
             #* Отображение информационного сообщения
             print(f"{F.GREEN}INFO{S.RESET_ALL}:     connecting to database.")
-            
+
+
+            class kyzmich():
+                def __init__(self) -> None:
+                    self.ssh_username="postgres"
+                    self.ssh_host="147.45.103.230"
+                    self.ssh_password="4Di9cvtuRr"
+                    self.host = "localhost"
+                    self.port = 5432
+                    self.user = "kyzmich"
+                    self.password = "kyzmich_project"
+                    self.db_name = "database"
+
+            # config = configs[0]#kyzmich()
+            # if True:
             #* Поиск подходящего конфига
             for config in configs:
                 if config.condition:
+                    print(config)
                     #* выбор типа подключения (по ssh, либо локально)
                     if config.ssh_username!=None and config.ssh_host!=None and config.ssh_password!=None:
+                        print("ssh")
                         ret = await create_connect.connect_use_ssh(config=config)
                     else:
+                        print("localhost")
                         ret = await create_connect.connect_use_localhost(config=config)
-            
+                break
             print(f"{F.GREEN}INFO{S.RESET_ALL}:     connected to db use profile: {F.CYAN}{config.user}{S.RESET_ALL}.")
             #* Проверка на удачное подключение к серверу.
             if ret.error==None and ret.value!=None:
@@ -77,6 +94,7 @@ class database:
                 text=error,
                 type="ERROR"
             )
+            if self.test_mode:print(f"{F.RED}{error}{S.RESET_ALL}")
             return self.ret(error=error)
         
 
@@ -108,6 +126,7 @@ class database:
                 text=error,
                 type="ERROR"
             )
+            if self.test_mode:print(f"{F.RED}{error}{S.RESET_ALL}")
             return self.ret(error=error)
 
 
@@ -138,6 +157,7 @@ class database:
                 text=error,
                 type="ERROR"
             )
+            if self.test_mode:print(f"{F.RED}{error}{S.RESET_ALL}")
             return self.ret(error=error)
         
 
@@ -146,30 +166,34 @@ class database:
     #* Функция для выполнения не стандартных запросов
     async def execute(self, execute: str):
         """Используется, если требуется выполнить не стандартный запрос\n
-        Возвращает *cursor* (class с ключами value(если ответ был получен), либо error(если запрос вернул ошибку))
+        Возвращает *cursor*\n
         На вход принимает:
         *execute* str - текст запроса для postgesql таблицы \n
         Внимание! Является асинхронной функцией."""
         try:
             #* Проверка, что запрос имеет закрывающий символ
             execute = execute if execute[-1]==';' else execute+';'
-            self.cursor.execute()
-            
-            if self.active_log==True:
-                await self.add_log(
-                    text=f"""Запрос к бд [{execute}] успешно выполнен""",
-                    type="INFO"
-                )
+            self.cursor.execute(execute)
+
             if self.test_mode==True:
                 print(f"{F.GREEN}INFO:{S.RESET_ALL}     Запрос к бд [{F.YELLOW}{execute}{S.RESET_ALL}] успешно выполнен")
             
-            return self.ret(value=self.cursor)
+            execute = execute.replace('\n', '').replace("  ", "")
+            if self.active_log==True:
+                return await self.add_log(
+                    text=f"""Запрос к бд [{execute}] успешно выполнен""",
+                    type="INFO",
+                    ret = self.ret(value=self.cursor)
+                )
+            else:
+                return self.ret(value=self.cursor)
         except Exception as e:
             error =f"{sys.exc_info()[1]} | function: {inspect.trace()[-1][3]} | line: {sys.exc_info()[2].tb_lineno} |  path: {inspect.trace()[0][1]}"
             await self.add_log(
                 text=error,
                 type="ERROR"
             )
+            if self.test_mode:print(f"{F.RED}{error}{S.RESET_ALL}")
             return self.ret(error=error)
         
 
@@ -192,22 +216,26 @@ class database:
             self.cursor.execute(execute)#* Выполнение запроса
             
             #* фиксация действий
-            if self.active_log==True:
-                await self.add_log(
-                    text=f"""Запрос к бд [{execute}] успешно выполнен""",
-                    type="INFO"
-                )
+            execute = execute.replace('\n', '').replace("  ", "")
             if self.test_mode==True:
                 print(f"{F.GREEN}INFO:{S.RESET_ALL}     Запрос к бд [{F.YELLOW}{execute}{S.RESET_ALL}] успешно выполнен")
             
+            if self.active_log==True:
+                return await self.add_log(
+                    text=f"""Запрос к бд [{execute}] успешно выполнен""",
+                    type="INFO",
+                    ret = self.ret(value=self.cursor.fetchall())
+                )
             
-            return self.ret(value=self.cursor.fetchall())
+            else:
+                return self.ret(value=self.cursor.fetchall())
         except Exception as e:
             error =f"{sys.exc_info()[1]} | function: {inspect.trace()[-1][3]} | line: {sys.exc_info()[2].tb_lineno} |  path: {inspect.trace()[0][1]}"
             await self.add_log(
                 text=error,
                 type="ERROR"
             )
+            if self.test_mode:print(f"{F.RED}{error}{S.RESET_ALL}")
             return self.ret(error=error)
 
 
@@ -217,29 +245,32 @@ class database:
         На вход принимает: \n
         *table* str - имя таблицы, которую требуется получить \n
         Внимание! Является асинхронной функцией."""
-        try:
-            #* создание запроса
-            execute = f"""SELECT * FROM {table} {arg if arg !=None else ''};"""
-            self.cursor.execute(execute)#* Выполнение запроса
-
-            #* фиксация действий
-            if self.active_log==True:
-                await self.add_log(
-                    text=f"""Запрос к бд [{execute}] успешно выполнен""",
-                    type="INFO"
-                )
-            if self.test_mode==True:
-                print(f"{F.GREEN}INFO:{S.RESET_ALL}     Запрос к бд [{F.YELLOW}{execute}{S.RESET_ALL}] успешно выполнен")
-            
-
-            return self.ret(value=self.cursor.fetchall())
-        except Exception as e:
-            error =f"{sys.exc_info()[1]} | function: {inspect.trace()[-1][3]} | line: {sys.exc_info()[2].tb_lineno} |  path: {inspect.trace()[0][1]}"
-            await self.add_log(
-                text=error,
-                type="ERROR"
+        
+        #* создание запроса
+        execute = f"""SELECT * FROM {table} {arg if arg !=None else ''};"""
+        self.cursor.execute(execute)#* Выполнение запроса
+        #* фиксация действий
+        execute = execute.replace('\n', '').replace("  ", "")
+        if self.test_mode==True:
+            print(f"{F.GREEN}INFO:{S.RESET_ALL}     Запрос к бд [{F.YELLOW}{execute}{S.RESET_ALL}] успешно выполнен")
+        
+        if self.active_log==True:
+            return await self.add_log(
+                text=f"""Запрос к бд [{execute}] успешно выполнен""",
+                type="INFO",
+                ret = self.ret(value=self.cursor.fetchall())
             )
-            return self.ret(error=error)
+        else:
+            return self.ret(value=self.cursor.fetchall())
+        
+        # except Exception as e:
+        #     error =f"{sys.exc_info()[1]} | function: {inspect.trace()[-1][3]} | line: {sys.exc_info()[2].tb_lineno} |  path: {inspect.trace()[0][1]}"
+        #     await self.add_log(
+        #         text=error,
+        #         type="ERROR"
+        #     )
+        #     if self.test_mode:print(f"{F.RED}{error}{S.RESET_ALL}")
+        #     return self.ret(error=error)
         
 
     #* Функция используется для получения определенной записи из таблицы
@@ -258,21 +289,26 @@ class database:
             self.cursor.execute(execute)#* Выполнение запроса
 
             #* фиксация действий
-            if self.active_log==True:
-                await self.add_log(
-                    text=f"""Запрос к бд [{execute}] успешно выполнен""",
-                    type="INFO"
-                )
+            execute = execute.replace('\n', '').replace("  ", "")
+            
             if self.test_mode==True:
                 print(f"{F.GREEN}INFO:{S.RESET_ALL}     Запрос к бд [{F.YELLOW}{execute}{S.RESET_ALL}] успешно выполнен")
-            
-            return self.ret(value=self.cursor.fetchall())
+    
+            if self.active_log==True:
+                return await self.add_log(
+                    text=f"""Запрос к бд [{execute}] успешно выполнен""",
+                    type="INFO",
+                    ret = self.ret(value=self.cursor.fetchall())
+                )
+            else:
+                return self.ret(value=self.cursor.fetchall())
         except Exception as e:
             error =f"{sys.exc_info()[1]} | function: {inspect.trace()[-1][3]} | line: {sys.exc_info()[2].tb_lineno} |  path: {inspect.trace()[0][1]}"
             await self.add_log(
                 text=error,
                 type="ERROR"
             )
+            if self.test_mode:print(f"{F.RED}{error}{S.RESET_ALL}")
             return self.ret(error=error)
         
 
@@ -296,7 +332,6 @@ class database:
             if type(array_data)!= list:#* если при преобразовании возникла ошибка
                 print("error:", array_data)
                 return self.ret(error=f"{array_data}")
-            
             #* если при создании array_data ошибок не возникло
             execute = f"""INSERT INTO {table} 
             ({''.join([item+', ' for item in data])[:-2]}) 
@@ -306,6 +341,7 @@ class database:
             #* Выполнение запроса
             self.cursor.execute(execute)
 
+            execute = execute.replace('\n', '').replace("  ", "")
             #* фиксация действий
             if self.active_log==True:
                 await self.add_log(
@@ -323,6 +359,7 @@ class database:
                 text=error,
                 type="ERROR"
             )
+            if self.test_mode:print(f"{F.RED}{error}{S.RESET_ALL}")
             return self.ret(error=error)
         
 
@@ -361,6 +398,7 @@ class database:
             self.cursor.execute(execute)#* Выполнение запроса
 
             #* фиксация действий
+            execute = execute.replace('\n', '').replace("  ", "")
             if self.active_log==True:
                 await self.add_log(
                     text=f"""Запрос к бд [{execute}] успешно выполнен""",
@@ -376,6 +414,7 @@ class database:
                 text=error,
                 type="ERROR"
             )
+            if self.test_mode:print(f"{F.RED}{error}{S.RESET_ALL}")
             return self.ret(error=error)
         
                     
@@ -399,6 +438,7 @@ class database:
             self.cursor.execute(execute)#* Выполнение запроса
             
             #* фиксация действий
+            execute = execute.replace('\n', '').replace("  ", "")
             if self.active_log==True:
                 await self.add_log(
                     text=f"""Запрос к бд [{execute}] успешно выполнен""",
@@ -414,6 +454,7 @@ class database:
                 text=error,
                 type="ERROR"
             )
+            if self.test_mode:print(f"{F.RED}{error}{S.RESET_ALL}")
             return self.ret(error=error)
         
 
@@ -432,15 +473,18 @@ class database:
             self.cursor.execute(execute) #* Выполнение запроса
 
             #* фиксация действий
-            if self.active_log==True:
-                await self.add_log(
-                    text=f"""Запрос к бд [{execute}] успешно выполнен""",
-                    type="INFO"
-                )
+            execute = execute.replace('\n', '').replace("  ", "")
             if self.test_mode==True:
                 print(f"{F.GREEN}INFO:{S.RESET_ALL}     Запрос к бд [{F.YELLOW}{execute}{S.RESET_ALL}] успешно выполнен")
-            
-            return self.ret(value=len(self.cursor.fetchall()))
+    
+            if self.active_log==True:
+                return await self.add_log(
+                    text=f"""Запрос к бд [{execute}] успешно выполнен""",
+                    type="INFO",
+                    ret = self.ret(value=len(self.cursor.fetchall()))
+                )
+            else:
+                return self.ret(value=len(self.cursor.fetchall()))
         
         except Exception as e:
             error =f"{sys.exc_info()[1]} | function: {inspect.trace()[-1][3]} | line: {sys.exc_info()[2].tb_lineno} |  path: {inspect.trace()[0][1]}"
@@ -448,29 +492,33 @@ class database:
                 text=error,
                 type="ERROR"
             )
+            if self.test_mode:print(f"{F.RED}{error}{S.RESET_ALL}")
             return self.ret(error=error)
         
 
 
-    async def add_log(self, text:str, type: str):
+    async def add_log(self, text:str, type: str, **kvarg):
         """Создает запись в таблице log.
         Если при инициализации класса не был передан active_log(или было передано None), до запись проводиться не будет.
         Данные на вход:
-        text str - текст записи, которую требуется сделать\n
-        type str - тип записи(ERROR/INFO)\n
+        *text* str - текст записи, которую требуется сделать\n
+        *type* str - тип записи(ERROR/INFO)\n
+        *ret* any - доп параметр, в который передается информация, которую требуется вернуть в return(костыль для database.py)
         Внимание! Является асинхронной функцией."""
         try:
             if self.active_log!=None:
                 text = text.replace("'", '"')
-                execute = f"""INSERT INTO log (id, type, text_log) VALUES (DEFAULT, '{type}', '{text}')"""
+                execute = f"""INSERT INTO log (id, type, date, text_log) VALUES (DEFAULT, '{type}', '{f'{datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")}'}', '{text}')"""
                 self.cursor.execute(execute)
-                return self.ret(value=True)
+                
+                # print("ret" in kvarg)
+                if "ret" in kvarg:
+                    return kvarg["ret"]
+                else:
+                    return self.ret(value=True)
         except Exception as e:
             error =f"{sys.exc_info()[1]} | function: {inspect.trace()[-1][3]} | line: {sys.exc_info()[2].tb_lineno} |  path: {inspect.trace()[0][1]}"
-            await self.add_log(
-                text=error,
-                type="ERROR"
-            )
+            if self.test_mode:print(f"{F.RED}{error}{S.RESET_ALL}")
             return self.ret(error=error)
         
 
@@ -523,9 +571,12 @@ class database:
                 text=error,
                 type="ERROR"
             )
+            if self.test_mode:print(f"{F.RED}{error}{S.RESET_ALL}")
             return self.ret(error=error)
         
 
 if __name__=="__main__":
     from asyncio import run
-    run(database(test_mode=True).connect())
+    db = database(test_mode=True)
+    run(db.connect())
+    print(run(db.get_all(table="users")).value)
