@@ -53,10 +53,13 @@ class database:
             #* Поиск подходящего конфига
             for config in configs:
                 if config.condition:
+                    print(config)
                     #* выбор типа подключения (по ssh, либо локально)
                     if config.ssh_username!=None and config.ssh_host!=None and config.ssh_password!=None:
+                        print("ssh")
                         ret = await create_connect.connect_use_ssh(config=config)
                     else:
+                        print("localhost")
                         ret = await create_connect.connect_use_localhost(config=config)
                 break
             print(f"{F.GREEN}INFO{S.RESET_ALL}:     connected to db use profile: {F.CYAN}{config.user}{S.RESET_ALL}.")
@@ -246,27 +249,24 @@ class database:
             #* создание запроса
             execute = f"""SELECT * FROM {table} {arg if arg !=None else ''};"""
             self.cursor.execute(execute)#* Выполнение запроса
+
             #* фиксация действий
-            execute = execute.replace('\n', '').replace("  ", "")
+            if self.active_log==True:
+                await self.add_log(
+                    text=f"""Запрос к бд [{execute}] успешно выполнен""",
+                    type="INFO"
+                )
             if self.test_mode==True:
                 print(f"{F.GREEN}INFO:{S.RESET_ALL}     Запрос к бд [{F.YELLOW}{execute}{S.RESET_ALL}] успешно выполнен")
             
-            if self.active_log==True:
-                return await self.add_log(
-                    text=f"""Запрос к бд [{execute}] успешно выполнен""",
-                    type="INFO",
-                    ret = self.ret(value=self.cursor.fetchall())
-                )
-            else:
-                return self.ret(value=self.cursor.fetchall())
-        
+
+            return self.ret(value=self.cursor.fetchall())
         except Exception as e:
             error =f"{sys.exc_info()[1]} | function: {inspect.trace()[-1][3]} | line: {sys.exc_info()[2].tb_lineno} |  path: {inspect.trace()[0][1]}"
             await self.add_log(
                 text=error,
                 type="ERROR"
             )
-            if self.test_mode:print(f"{F.RED}{error}{S.RESET_ALL}")
             return self.ret(error=error)
         
 
@@ -507,11 +507,7 @@ class database:
                 text = text.replace("'", '"')
                 execute = f"""INSERT INTO log (id, type, date, text_log) VALUES (DEFAULT, '{type}', '{f'{datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")}'}', '{text}')"""
                 self.cursor.execute(execute)
-                
-                if "ret" in kvarg:
-                    return kvarg["ret"]
-                else:
-                    return self.ret(value=True)
+                return self.ret(value=True)
         except Exception as e:
             error =f"{sys.exc_info()[1]} | function: {inspect.trace()[-1][3]} | line: {sys.exc_info()[2].tb_lineno} |  path: {inspect.trace()[0][1]}"
             if self.test_mode:print(f"{F.RED}{error}{S.RESET_ALL}")
@@ -569,3 +565,7 @@ class database:
             if self.test_mode:print(f"{F.RED}{error}{S.RESET_ALL}")
             return self.ret(error=error)
         
+
+if __name__=="__main__":
+    from asyncio import run
+    run(database(test_mode=True).connect())
