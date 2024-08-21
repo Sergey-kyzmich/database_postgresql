@@ -53,14 +53,14 @@ configs=[]
 # таблица log требуется для создания записей с логами()
 #? Если такой таблицы не требуется, то при инициализации класса требуется либо задать active_log=None, либо не указывать вовсе.
 create_tables = [
-    """CREATE TABLE IF NOT EXISTS log (id SERIAL, type TEXT, text_log TEXT);"""
+    """CREATE TABLE IF NOT EXISTS log (id SERIAL, type TEXT, date TEXT, text_log TEXT);"""
     ]
 
 #? Пример:
 
 # create_tables = [
 #     """CREATE TABLE table1 (id integer, name TEXT);""",
-#     """CREATE TABLE IF NOT EXISTS log (id SERIAL, type TEXT, text_log TEXT);"""
+#     """CREATE TABLE IF NOT EXISTS log (id SERIAL, type TEXT, date TEXT, text_log TEXT);"""
 # ]
 
 
